@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI-SIGNAL Research Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111f;
+      --panel: #101c2f;
+      --panel-2: #14243b;
+      --text: #e6eefc;
+      --muted: #9db0ce;
+      --line: #263b5f;
+      --accent: #4dd0e1;
+      --good: #53d18a;
+      --bad: #ff6b6b;
+      --warn: #ffd166;
+      --shadow: 0 18px 55px rgba(0,0,0,.32);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(77,208,225,.16), transparent 35%), var(--bg);
+      color: var(--text);
+    }
+    header { padding: 28px clamp(16px, 4vw, 44px) 10px; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 4vw, 3.2rem); letter-spacing: -.04em; }
+    h2 { margin: 0 0 16px; font-size: 1.05rem; color: #f7fbff; }
+    h3 { margin: 0 0 10px; font-size: .96rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    p { color: var(--muted); line-height: 1.55; }
+    ul, ol { color: var(--muted); line-height: 1.55; padding-left: 20px; }
+    .app { padding: 16px clamp(16px, 4vw, 44px) 44px; display: grid; gap: 18px; }
+    .hero, .panel { background: linear-gradient(145deg, rgba(20,36,59,.96), rgba(10,20,36,.96)); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); }
+    .hero { padding: 22px; display: grid; grid-template-columns: 1.7fr 1fr; gap: 18px; align-items: center; }
+    .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .badge { border: 1px solid var(--line); border-radius: 999px; padding: 7px 10px; color: var(--muted); background: rgba(255,255,255,.03); font-size: .86rem; }
+    .grid { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 18px; align-items: start; }
+    .panel { padding: 18px; }
+    .settings { display: grid; gap: 14px; }
+    label { display: grid; gap: 6px; color: var(--muted); font-size: .9rem; }
+    input, select, textarea, button {
+      width: 100%; border: 1px solid var(--line); border-radius: 12px; background: #071221; color: var(--text); padding: 10px 12px; font: inherit;
+    }
+    textarea { min-height: 76px; resize: vertical; }
+    input[type="checkbox"] { width: auto; transform: scale(1.15); }
+    input[type="file"] { display: none; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .checkline { display: flex; gap: 10px; align-items: center; color: var(--muted); }
+    button, .file-button { cursor: pointer; background: linear-gradient(135deg, #1ea9bd, #4469ff); border: 0; font-weight: 700; transition: transform .15s ease; text-align: center; }
+    button:hover, .file-button:hover { transform: translateY(-1px); }
+    button.secondary, .file-button.secondary { background: #0b182b; border: 1px solid var(--line); color: var(--muted); }
+    .file-button { display: block; border-radius: 12px; padding: 11px 12px; color: var(--text); }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .stat { background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: 16px; padding: 14px; min-height: 92px; }
+    .stat span { display: block; color: var(--muted); font-size: .82rem; margin-bottom: 8px; }
+    .stat strong { font-size: 1.45rem; letter-spacing: -.03em; }
+    .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+    .charts { display: grid; grid-template-columns: 1fr; gap: 18px; }
+    .chart-wrap { min-height: 330px; }
+    canvas { width: 100% !important; max-height: 430px; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 8px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    .scroll { overflow-x: auto; }
+    .status { padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.03); color: var(--muted); }
+    .warning-box { border-color: rgba(255,209,102,.45); background: rgba(255,209,102,.08); }
+    .danger-box { border-color: rgba(255,107,107,.55); background: rgba(255,107,107,.10); }
+    .success-box { border-color: rgba(83,209,138,.45); background: rgba(83,209,138,.08); }
+    .small { font-size: .84rem; color: var(--muted); }
+    .drop-zone {
+      border: 2px dashed rgba(77,208,225,.55);
+      border-radius: 18px;
+      padding: 20px;
+      text-align: center;
+      background: rgba(77,208,225,.06);
+      display: grid;
+      gap: 12px;
+    }
+    .drop-zone.dragover { border-color: var(--good); background: rgba(83,209,138,.12); }
+    .drop-zone strong { font-size: 1.05rem; }
+    .source-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .diagnostics { display: grid; gap: 10px; }
+    .filter-list { display: grid; gap: 6px; margin-top: 8px; }
+    .filter-row { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(255,255,255,.08); padding: 6px 0; color: var(--muted); }
+    .hidden { display: none !important; }
+    @media (max-width: 1040px) { .grid, .hero { grid-template-columns: 1fr; } .stats, .source-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 620px) { .row, .stats, .source-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI-SIGNAL Research Dashboard</h1>
+    <p>Standalone backtest- och pappershandelsverktyg för lågfreventa svenska aktiesignaler. CSV-import är huvudflödet eftersom live-API:er ofta blockeras i statiska webbsidor.</p>
+  </header>
+  <main class="app">
+    <section class="hero">
+      <div>
+        <h2>Säkerhetsfokus: riktig data via CSV, färre signaler och strikt risk</h2>
+        <p>Strategin ersätter win-streak-riskökning med fast fraktionell risk, högre tidsramstrend, EMA-alignment, RSI-bekräftelse, ATR-volatilitetsfilter, volymfilter och minsta reward/risk.</p>
+        <div class="badge-row">
+          <span class="badge">CSV är rekommenderad datakälla</span><span class="badge">Max 5 trades per dag</span><span class="badge">Long-only som standard</span><span class="badge">Ingen Avanza-exekvering</span>
+        </div>
+      </div>
+      <div class="status danger-box"><strong>Viktig disclaimer:</strong><br>This tool is for research and paper trading only. It is not financial advice and does not guarantee profit.</div>
+    </section>
+
+    <section id="liveDataFailedPanel" class="panel danger-box">
+      <h2>Live data failed. Import CSV to backtest real data.</h2>
+      <ol>
+        <li>Exportera historisk OHLCV-data från valfri laglig källa.</li>
+        <li>Kontrollera kolumnerna: <strong>Date, Open, High, Low, Close, Volume</strong>.</li>
+        <li>Dra CSV-filen till importzonen eller använd knappen “Välj CSV-fil”.</li>
+        <li>Klicka sedan på <strong>Kör backtest</strong>.</li>
+      </ol>
+      <p class="small">Yahoo Finance kan misslyckas i Chrome på grund av CORS, endpoint-restriktioner och browser-säkerhet. Demo-data är endast testdata, inte marknadsdata.</p>
+    </section>
+
+    <div class="grid">
+      <aside class="panel settings">
+        <section>
+          <h2>1. Strategiinställningar</h2>
+          <div class="row">
+            <label>Startkapital <input id="initialCapital" type="number" min="1" value="100" step="10"></label>
+            <label>Max trades per dag <input id="maxTrades" type="number" min="1" max="5" value="5"></label>
+          </div>
+          <div class="row">
+            <label>Risk per trade (%) <input id="riskPct" type="number" min="0.1" max="5" value="1" step="0.1"></label>
+            <label>Dagens förlustgräns (%) <input id="dailyLossPct" type="number" min="0.5" max="20" value="3" step="0.5"></label>
+          </div>
+          <div class="row">
+            <label>Stop loss ATR <input id="stopAtr" type="number" min="0.5" value="1.8" step="0.1"></label>
+            <label>Take profit ATR <input id="takeAtr" type="number" min="1" value="3.2" step="0.1"></label>
+          </div>
+          <div class="row">
+            <label>Cooldown (dagar) <input id="cooldown" type="number" min="1" value="3"></label>
+            <label>Min reward/risk <input id="minRR" type="number" min="1" value="1.6" step="0.1"></label>
+          </div>
+          <div class="row">
+            <label>Avgift (%) <input id="feePct" type="number" min="0" value="0.25" step="0.01"></label>
+            <label>Slippage (%) <input id="slippagePct" type="number" min="0" value="0.10" step="0.01"></label>
+          </div>
+          <div class="checkline"><input id="longOnly" type="checkbox" checked><span>Long-only mode</span></div>
+          <div class="checkline"><input id="paperMode" type="checkbox" checked><span>Pappershandel aktiv (simulerat)</span></div>
+        </section>
+
+        <section>
+          <h2>2. CSV-import (rekommenderat)</h2>
+          <div id="dropZone" class="drop-zone">
+            <strong>Dra och släpp CSV här</strong>
+            <span class="small">Krav: Date, Open, High, Low, Close, Volume</span>
+            <label class="file-button" for="csvFile">Välj CSV-fil</label>
+            <input id="csvFile" type="file" accept=".csv,text/csv">
+          </div>
+          <div id="csvStatus" class="status warning-box" style="margin-top:12px;">Ingen CSV laddad. Importera realdata eller välj en demo nedan.</div>
+          <label style="margin-top:12px;">Namn/symbol för importerad data <input id="datasetName" placeholder="t.ex. ERIC-B.ST från CSV" value="CSV-data"></label>
+          <button id="runBtn" style="margin-top:12px;">Kör backtest</button>
+        </section>
+
+        <section>
+          <h2>3. Testdata och liveförsök</h2>
+          <label>Inbyggda demo-datasets
+            <select id="sampleSelect">
+              <option value="trendUp">Demo: trend up</option>
+              <option value="sideways">Demo: sideways/choppy</option>
+              <option value="downtrend">Demo: downtrend</option>
+            </select>
+          </label>
+          <button class="secondary" id="loadSampleBtn">Ladda vald demo</button>
+          <p class="small">Demo-datasets är endast för test av UI och strategi. De är inte real market data.</p>
+          <label>Valfri Yahoo-symbol för liveförsök
+            <input id="liveSymbol" value="ERIC-B.ST" placeholder="t.ex. ERIC-B.ST">
+          </label>
+          <div class="row">
+            <label>Från <input id="fromDate" type="date"></label>
+            <label>Till <input id="toDate" type="date"></label>
+          </div>
+          <button class="secondary" id="tryLiveBtn">Försök hämta live-data</button>
+        </section>
+      </aside>
+
+      <section class="charts">
+        <div class="panel">
+          <h2>4. Data source status</h2>
+          <div id="dataStatus" class="status warning-box">CSV är huvudflödet. Ingen riktig marknadsdata är laddad ännu.</div>
+          <div id="demoWarning" class="status danger-box hidden" style="margin-top:12px;"><strong>You are using demo data, not real market data.</strong><br>Importera CSV för att backtesta verklig historik.</div>
+          <p class="small">Ingen broker-login, inga riktiga order, inga API-nycklar sparas i webbläsaren och ingen Avanza-exekvering används.</p>
+        </div>
+
+        <div class="panel">
+          <h2>5. Strategidiagnostik</h2>
+          <div id="diagnostics" class="diagnostics status">Ladda CSV eller demo-data för att visa raw signal count, filtered signal count, final trade count och blockerande filter.</div>
+        </div>
+
+        <div class="panel">
+          <h2>6. Backtest summary, ROI och drawdown dashboard</h2>
+          <div class="stats" id="stats"></div>
+        </div>
+
+        <div class="panel chart-wrap">
+          <h2>7. Signaler och EMA-overlay</h2>
+          <canvas id="priceChart"></canvas>
+        </div>
+        <div class="panel chart-wrap">
+          <h2>Aktiekurva och drawdown</h2>
+          <canvas id="equityChart"></canvas>
+        </div>
+        <div class="panel chart-wrap">
+          <h2>Dagligt antal trades</h2>
+          <canvas id="dailyChart"></canvas>
+        </div>
+
+        <div class="panel">
+          <h2>8. Handelslogg</h2>
+          <div class="scroll"><table><thead><tr><th>Datum in</th><th>Datum ut</th><th>Typ</th><th>In</th><th>Ut</th><th>Antal</th><th>P/L</th><th>Orsak</th></tr></thead><tbody id="tradeRows"></tbody></table></div>
+        </div>
+
+        <div class="panel">
+          <h2>9. Pappershandel</h2>
+          <p>Journalen sparas lokalt i webbläsaren och skickar aldrig order.</p>
+          <div class="row"><label>Anteckning <input id="journalNote" placeholder="Plan, känsla, observation"></label><button id="saveNote">Spara journalrad</button></div>
+          <div class="scroll"><table><thead><tr><th>Tid</th><th>Symbol</th><th>Anteckning</th></tr></thead><tbody id="journalRows"></tbody></table></div>
+        </div>
+
+        <div class="panel warning-box">
+          <h2>10. Risk warnings</h2>
+          <ul>
+            <li>100 SEK är mycket litet startkapital; courtage, spread och avrundning kan göra verklig handel olönsam eller omöjlig.</li>
+            <li>Backtester kan överanpassas och tar inte hänsyn till alla marknadshändelser, skatter eller likviditetsproblem.</li>
+            <li>Ingen martingale, ingen win-streak size increase, ingen hävstång och ingen blankning som standard.</li>
+            <li>This tool is for research and paper trading only. It is not financial advice and does not guarantee profit.</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </main>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (n, d=2) => Number.isFinite(n) ? n.toLocaleString('sv-SE', { maximumFractionDigits:d, minimumFractionDigits:d }) : '–';
+const pct = n => Number.isFinite(n) ? `${fmt(n,2)}%` : '–';
+let charts = {};
+let currentDataset = null;
+
+function makeDemoData(kind) {
+  const out = [];
+  const start = new Date('2024-01-02T00:00:00Z');
+  let close = kind === 'downtrend' ? 125 : kind === 'sideways' ? 95 : 72;
+  let calendar = new Date(start);
+  for (let i = 0; out.length < 280; i++) {
+    if (calendar.getUTCDay() !== 0 && calendar.getUTCDay() !== 6) {
+      const cycle = Math.sin(i / 13) * (kind === 'sideways' ? 1.15 : 0.55);
+      const pulse = Math.sin(i * 1.9) * (kind === 'sideways' ? 0.75 : 0.38);
+      const drift = kind === 'trendUp' ? 0.16 : kind === 'downtrend' ? -0.13 : Math.sin(i / 31) * 0.04;
+      const open = close + Math.sin(i / 3) * 0.35;
+      close = Math.max(12, close + drift + cycle + pulse);
+      const high = Math.max(open, close) + 0.8 + Math.abs(Math.sin(i * .7));
+      const low = Math.min(open, close) - 0.8 - Math.abs(Math.cos(i * .5));
+      const volumeBase = kind === 'sideways' ? 380000 : 720000;
+      const volume = Math.round(volumeBase + Math.abs(Math.sin(i / 8)) * 850000 + (i % 19) * 13000);
+      out.push({ date: calendar.toISOString().slice(0,10), open:+open.toFixed(2), high:+high.toFixed(2), low:+low.toFixed(2), close:+close.toFixed(2), volume });
+    }
+    calendar.setUTCDate(calendar.getUTCDate() + 1);
+  }
+  return out;
+}
+
+const SAMPLE_DATASETS = {
+  trendUp: { name:'Demo: trend up', rows:makeDemoData('trendUp') },
+  sideways: { name:'Demo: sideways/choppy', rows:makeDemoData('sideways') },
+  downtrend: { name:'Demo: downtrend', rows:makeDemoData('downtrend') }
+};
+
+function initDates() {
+  const to = new Date();
+  const from = new Date();
+  from.setFullYear(to.getFullYear() - 2);
+  $('fromDate').value = from.toISOString().slice(0,10);
+  $('toDate').value = to.toISOString().slice(0,10);
+}
+
+function getSettings() {
+  return {
+    initialCapital:+$('initialCapital').value,
+    maxTrades:Math.min(5, Math.max(1, +$('maxTrades').value || 5)),
+    riskPct:(+$('riskPct').value || 1)/100,
+    dailyLossPct:(+$('dailyLossPct').value || 3)/100,
+    stopAtr:+$('stopAtr').value,
+    takeAtr:+$('takeAtr').value,
+    cooldown:+$('cooldown').value,
+    minRR:+$('minRR').value,
+    feePct:+$('feePct').value/100,
+    slippagePct:+$('slippagePct').value/100,
+    longOnly:$('longOnly').checked,
+    paperMode:$('paperMode').checked
+  };
+}
+
+function dateRange(rows) {
+  if (!rows.length) return '–';
+  return `${rows[0].date} → ${rows[rows.length - 1].date}`;
+}
+
+function setStatus(message, type='warning') {
+  const el = $('dataStatus');
+  el.className = `status ${type === 'success' ? 'success-box' : type === 'danger' ? 'danger-box' : 'warning-box'}`;
+  el.innerHTML = message;
+}
+
+function setCsvStatus(message, type='warning') {
+  const el = $('csvStatus');
+  el.className = `status ${type === 'success' ? 'success-box' : type === 'danger' ? 'danger-box' : 'warning-box'}`;
+  el.textContent = message;
+}
+
+async function loadYahooData(symbol) {
+  const from = Math.floor(new Date($('fromDate').value + 'T00:00:00Z').getTime()/1000);
+  const to = Math.floor(new Date($('toDate').value + 'T23:59:59Z').getTime()/1000);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${from}&period2=${to}&interval=1d&events=history&includeAdjustedClose=true`;
+  const res = await fetch(url, { mode:'cors' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const result = json.chart?.result?.[0];
+  if (!result?.timestamp?.length) throw new Error('Tomt svar');
+  const q = result.indicators.quote[0];
+  const rows = result.timestamp.map((t, i) => ({
+    date:new Date(t*1000).toISOString().slice(0,10),
+    open:q.open[i], high:q.high[i], low:q.low[i], close:q.close[i], volume:q.volume[i] || 0
+  })).filter(r => [r.open,r.high,r.low,r.close].every(Number.isFinite));
+  if (rows.length < 80) throw new Error('För få datapunkter');
+  return rows;
+}
+
+function ema(values, period) {
+  const k = 2 / (period + 1), out = [];
+  let prev = values[0];
+  values.forEach((v, i) => { prev = i === 0 ? v : v * k + prev * (1-k); out.push(prev); });
+  return out;
+}
+function sma(values, period) { return values.map((_, i) => i < period-1 ? null : values.slice(i-period+1, i+1).reduce((a,b)=>a+b,0)/period); }
+function atr(rows, period=14) {
+  const tr = rows.map((r, i) => i === 0 ? r.high-r.low : Math.max(r.high-r.low, Math.abs(r.high-rows[i-1].close), Math.abs(r.low-rows[i-1].close)));
+  return ema(tr, period);
+}
+function rsi(closes, period=14) {
+  const out = Array(closes.length).fill(null); let gain=0, loss=0;
+  for (let i=1;i<closes.length;i++) {
+    const ch = closes[i]-closes[i-1];
+    if (i <= period) {
+      gain += Math.max(ch,0); loss += Math.max(-ch,0);
+      if (i === period) out[i] = 100 - 100/(1 + (gain/period)/((loss/period)||1e-9));
+    } else {
+      gain = (gain*(period-1)+Math.max(ch,0))/period;
+      loss = (loss*(period-1)+Math.max(-ch,0))/period;
+      out[i] = 100 - 100/(1 + gain/(loss||1e-9));
+    }
+  }
+  return out;
+}
+
+function enrich(rows) {
+  const sorted = rows.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const closes = sorted.map(r=>r.close), vols = sorted.map(r=>r.volume);
+  const e5 = ema(closes,5), e9 = ema(closes,9), e20 = ema(closes,20), e50 = ema(closes,50), e100 = ema(closes,100), a14 = atr(sorted,14), r14 = rsi(closes,14), v20 = sma(vols,20);
+  return sorted.map((r,i)=>({ ...r, ema5:e5[i], ema9:e9[i], ema20:e20[i], ema50:e50[i], ema100:e100[i], atr14:a14[i], rsi14:r14[i], volSma20:v20[i] }));
+}
+
+function evaluateFilters(data, i, settings) {
+  const blocks = [];
+  if (i < 105) blocks.push('För kort historik för EMA100');
+  const r = data[i], p = data[i-1], ref = data[Math.max(0, i-10)];
+  const rr = settings.takeAtr / settings.stopAtr;
+  const checks = {
+    'Min reward/risk': rr >= settings.minRR,
+    'Högre trend EMA50/100': r.close > r.ema100 && r.ema50 > r.ema100 && r.ema20 > r.ema50,
+    'EMA-alignment 5/9/20': r.ema5 > r.ema9 && r.ema9 > r.ema20,
+    'Ny/tydlig EMA-rörelse': p.ema5 <= p.ema9 || ((r.ema5 - r.ema9) / r.close) > 0.003,
+    'RSI-bekräftelse': r.rsi14 >= 52 && r.rsi14 <= 68 && r.rsi14 > p.rsi14,
+    'ATR-volatilitetsfilter': (r.atr14 / r.close) >= 0.008 && (r.atr14 / r.close) <= 0.065,
+    'Volymfilter': r.volume > (r.volSma20 || 0) * 1.05,
+    'Inte flat period': Math.abs(r.ema20 - ref.ema20) / r.close > 0.004
+  };
+  Object.entries(checks).forEach(([name, ok]) => { if (!ok) blocks.push(name); });
+  return { pass:blocks.length === 0, blocks };
+}
+
+function isRawSignal(data, i) {
+  if (i < 21) return false;
+  const r = data[i], p = data[i-1];
+  return p.ema5 <= p.ema9 && r.ema5 > r.ema9 && r.close > r.ema20;
+}
+
+function collectDiagnostics(data, settings) {
+  const filterBlocks = {};
+  let rawSignals = 0, filteredSignals = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (!isRawSignal(data, i)) continue;
+    rawSignals++;
+    const check = evaluateFilters(data, i, settings);
+    if (check.pass) filteredSignals++;
+    check.blocks.forEach(name => { filterBlocks[name] = (filterBlocks[name] || 0) + 1; });
+  }
+  if (rawSignals === 0) filterBlocks['Raw EMA5/EMA9 setup saknas'] = Math.max(0, data.length - 21);
+  return { rawSignals, filteredSignals, filterBlocks };
+}
+
+function backtest(rows, settings) {
+  const data = enrich(rows), trades = [], equity = [], dailyCounts = new Map(), dayStart = new Map();
+  const diagnostics = collectDiagnostics(data, settings);
+  let cash = settings.initialCapital, peak = cash, maxDD = 0, pos = null, cooldownLeft = 0;
+  for (let i=1; i<data.length; i++) {
+    const r = data[i];
+    if (!dayStart.has(r.date)) dayStart.set(r.date, cash + (pos ? pos.qty*r.close : 0));
+    const accountValue = cash + (pos ? pos.qty*r.close : 0);
+    const dailyLoss = (accountValue - dayStart.get(r.date)) / dayStart.get(r.date);
+    if (pos) {
+      pos.trail = Math.max(pos.trail, r.close - settings.stopAtr * r.atr14);
+      let exitPrice = null, reason = '';
+      if (r.low <= pos.stop) { exitPrice = pos.stop; reason = 'Stop loss'; }
+      else if (r.high >= pos.target) { exitPrice = pos.target; reason = 'Take profit'; }
+      else if (r.low <= pos.trail && i - pos.index > 2) { exitPrice = pos.trail; reason = 'Trailing stop'; }
+      else if (r.ema5 < r.ema20 || r.rsi14 < 45) { exitPrice = r.close; reason = 'Trend/RSI exit'; }
+      if (exitPrice) {
+        exitPrice *= (1 - settings.slippagePct);
+        const gross = pos.qty * exitPrice;
+        const fee = gross * settings.feePct;
+        const exitCash = gross - fee;
+        cash += exitCash;
+        const pl = exitCash - pos.invested;
+        trades.push({ entryDate:pos.date, exitDate:r.date, side:'Long', entry:pos.entry, exit:exitPrice, qty:pos.qty, pl, reason });
+        pos = null; cooldownLeft = settings.cooldown;
+      }
+    }
+    const entryCheck = isRawSignal(data, i) ? evaluateFilters(data, i, settings) : { pass:false };
+    if (!pos && cooldownLeft <= 0 && dailyLoss > -settings.dailyLossPct && (dailyCounts.get(r.date)||0) < settings.maxTrades && entryCheck.pass) {
+      const stopDistance = settings.stopAtr * r.atr14;
+      const entry = r.close * (1 + settings.slippagePct);
+      const stop = entry - stopDistance;
+      const target = entry + settings.takeAtr * r.atr14;
+      const riskCash = cash * settings.riskPct;
+      const riskQty = Math.floor(riskCash / Math.max(entry-stop, 0.01));
+      const affordableQty = Math.floor(cash / (entry * (1 + settings.feePct)));
+      const qty = Math.max(0, Math.min(riskQty || 1, affordableQty));
+      if (qty > 0) {
+        const cost = qty * entry, fee = cost * settings.feePct;
+        cash -= cost + fee;
+        pos = { index:i, date:r.date, entry, stop, target, trail:stop, qty, invested:cost+fee };
+        dailyCounts.set(r.date, (dailyCounts.get(r.date)||0)+1);
+      } else {
+        diagnostics.filterBlocks['Position för dyr för kapital'] = (diagnostics.filterBlocks['Position för dyr för kapital'] || 0) + 1;
+      }
+    }
+    if (cooldownLeft > 0) cooldownLeft--;
+    const eq = cash + (pos ? pos.qty*r.close : 0);
+    peak = Math.max(peak, eq); maxDD = Math.min(maxDD, (eq - peak) / peak * 100);
+    equity.push({ date:r.date, equity:eq, drawdown:(eq - peak) / peak * 100, trades:dailyCounts.get(r.date)||0 });
+  }
+  if (pos) {
+    const r = data[data.length-1], exitPrice = r.close * (1 - settings.slippagePct), gross = pos.qty*exitPrice, fee = gross*settings.feePct;
+    const exitCash = gross - fee;
+    cash += exitCash;
+    trades.push({ entryDate:pos.date, exitDate:r.date, side:'Long', entry:pos.entry, exit:exitPrice, qty:pos.qty, pl:exitCash-pos.invested, reason:'Slut på testperiod' });
+    equity.push({ date:r.date, equity:cash, drawdown:(cash - peak) / peak * 100, trades:dailyCounts.get(r.date)||0 });
+  }
+  diagnostics.finalTrades = trades.length;
+  const wins = trades.filter(t=>t.pl>0), losses = trades.filter(t=>t.pl<=0);
+  return { data, trades, equity, diagnostics, summary:{
+    finalEquity: cash, roi:(cash/settings.initialCapital-1)*100, maxDD, trades:trades.length,
+    winRate: trades.length ? wins.length/trades.length*100 : 0,
+    avgWin: wins.length ? wins.reduce((a,t)=>a+t.pl,0)/wins.length : 0,
+    avgLoss: losses.length ? losses.reduce((a,t)=>a+t.pl,0)/losses.length : 0
+  }};
+}
+
+function renderStats(summary, settings) {
+  const lowCapital = settings.initialCapital < 500;
+  const items = [
+    ['Total ROI', pct(summary.roi), summary.roi >= 0 ? 'good':'bad'], ['Max drawdown', pct(summary.maxDD), 'bad'],
+    ['Vinstfrekvens', pct(summary.winRate), summary.winRate >= 50 ? 'good':'warn'], ['Antal trades', summary.trades, ''],
+    ['Slutvärde', `${fmt(summary.finalEquity)} SEK`, summary.finalEquity >= settings.initialCapital ? 'good':'bad'],
+    ['Genomsnittlig vinst', `${fmt(summary.avgWin)} SEK`, 'good'], ['Genomsnittlig förlust', `${fmt(summary.avgLoss)} SEK`, 'bad'],
+    ['Kapitalvarning', lowCapital ? 'Hög friktionsrisk' : 'OK', lowCapital ? 'warn':'good']
+  ];
+  $('stats').innerHTML = items.map(([k,v,c])=>`<div class="stat"><span>${k}</span><strong class="${c}">${v}</strong></div>`).join('');
+}
+
+function renderDiagnostics(diagnostics) {
+  const blockers = Object.entries(diagnostics.filterBlocks).sort((a,b) => b[1] - a[1]);
+  const blockerHtml = blockers.length
+    ? `<div class="filter-list">${blockers.map(([name,count]) => `<div class="filter-row"><span>${name}</span><strong>${count}</strong></div>`).join('')}</div>`
+    : '<p class="small">Inga blockerande filter registrerade.</p>';
+  const zeroTradeHint = diagnostics.finalTrades === 0
+    ? '<div class="status warning-box"><strong>0 trades:</strong> Tabellen nedan visar vilka filter som blockerade råa signaler. Om “Position för dyr för kapital” visas är startkapitalet för lågt för aktiepriset inklusive avgifter.</div>'
+    : '';
+  $('diagnostics').innerHTML = `
+    <div class="source-grid">
+      <div class="stat"><span>Raw signal count</span><strong>${diagnostics.rawSignals}</strong></div>
+      <div class="stat"><span>Filtered signal count</span><strong>${diagnostics.filteredSignals}</strong></div>
+      <div class="stat"><span>Final trade count</span><strong>${diagnostics.finalTrades}</strong></div>
+    </div>
+    ${zeroTradeHint}
+    <h3>Filter som blockerar signaler</h3>
+    ${blockerHtml}`;
+}
+
+function destroyCharts(){ Object.values(charts).forEach(c=>c.destroy()); charts = {}; }
+function renderCharts(result) {
+  destroyCharts();
+  const labels = result.data.map(r=>r.date);
+  const buyPoints = result.trades.map(t=>({ x:t.entryDate, y:t.entry }));
+  const sellPoints = result.trades.map(t=>({ x:t.exitDate, y:t.exit }));
+  charts.price = new Chart($('priceChart'), { type:'line', data:{ labels, datasets:[
+    { label:'Close', data:result.data.map(r=>r.close), borderColor:'#e6eefc', pointRadius:0 },
+    { label:'EMA 5', data:result.data.map(r=>r.ema5), borderColor:'#4dd0e1', pointRadius:0 },
+    { label:'EMA 9', data:result.data.map(r=>r.ema9), borderColor:'#ffd166', pointRadius:0 },
+    { label:'EMA 20', data:result.data.map(r=>r.ema20), borderColor:'#53d18a', pointRadius:0 },
+    { label:'Köp', type:'scatter', data:buyPoints, backgroundColor:'#53d18a', pointRadius:6 },
+    { label:'Sälj', type:'scatter', data:sellPoints, backgroundColor:'#ff6b6b', pointRadius:6 }
+  ]}, options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index'}, scales:{x:{ticks:{maxTicksLimit:10}}} } });
+  charts.equity = new Chart($('equityChart'), { type:'line', data:{ labels:result.equity.map(e=>e.date), datasets:[
+    { label:'Aktiekurva', data:result.equity.map(e=>e.equity), borderColor:'#53d18a', pointRadius:0, yAxisID:'y' },
+    { label:'Drawdown %', data:result.equity.map(e=>e.drawdown), borderColor:'#ff6b6b', pointRadius:0, yAxisID:'y1' }
+  ]}, options:{ responsive:true, maintainAspectRatio:false, scales:{x:{ticks:{maxTicksLimit:10}}, y1:{position:'right', grid:{drawOnChartArea:false}}} } });
+  charts.daily = new Chart($('dailyChart'), { type:'bar', data:{ labels:result.equity.map(e=>e.date), datasets:[{ label:'Trades per dag', data:result.equity.map(e=>e.trades), backgroundColor:'#4dd0e1' }]}, options:{ responsive:true, maintainAspectRatio:false, scales:{x:{ticks:{maxTicksLimit:10}}, y:{beginAtZero:true, suggestedMax:5}} } });
+}
+
+function renderTrades(trades) {
+  $('tradeRows').innerHTML = trades.length ? trades.map(t=>`<tr><td>${t.entryDate}</td><td>${t.exitDate}</td><td>${t.side}</td><td>${fmt(t.entry)}</td><td>${fmt(t.exit)}</td><td>${t.qty}</td><td class="${t.pl>=0?'good':'bad'}">${fmt(t.pl)} SEK</td><td>${t.reason}</td></tr>`).join('') : '<tr><td colspan="8">Inga trades med nuvarande filter. Se strategidiagnostik för blockerande filter.</td></tr>';
+}
+
+function renderDataset(dataset, shouldRun=true) {
+  currentDataset = dataset;
+  $('datasetName').value = dataset.name;
+  $('demoWarning').classList.toggle('hidden', dataset.type !== 'demo');
+  const type = dataset.type === 'csv' ? 'success' : dataset.type === 'live' ? 'success' : 'danger';
+  const prefix = dataset.type === 'demo' ? '<strong>You are using demo data, not real market data.</strong><br>' : '';
+  setStatus(`${prefix}Källa: ${dataset.source}. Namn: ${dataset.name}. Rader: ${dataset.rows.length}. Datum: ${dateRange(dataset.rows)}.`, type);
+  if (shouldRun) runBacktest();
+}
+
+function runBacktest() {
+  if (!currentDataset) {
+    setStatus('Ingen data laddad. Importera CSV för realdata eller välj en demo.', 'danger');
+    return;
+  }
+  if (currentDataset.type === 'demo') $('demoWarning').classList.remove('hidden');
+  const settings = getSettings();
+  const result = backtest(currentDataset.rows, settings);
+  renderStats(result.summary, settings);
+  renderDiagnostics(result.diagnostics);
+  renderCharts(result);
+  renderTrades(result.trades);
+}
+
+function parseNumber(value) {
+  if (value === undefined) return NaN;
+  return Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+}
+
+function splitCsvLine(line) {
+  const cells = [];
+  let current = '', quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+    else if (ch === '"') quoted = !quoted;
+    else if (ch === ',' && !quoted) { cells.push(current); current = ''; }
+    else current += ch;
+  }
+  cells.push(current);
+  return cells.map(c => c.trim().replace(/^"|"$/g, ''));
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) throw new Error('CSV måste innehålla header och minst en datarad.');
+  const headers = splitCsvLine(lines.shift()).map(h=>h.trim().toLowerCase());
+  const required = ['date','open','high','low','close','volume'];
+  const missing = required.filter(name => !headers.includes(name));
+  if (missing.length) throw new Error(`Saknade kolumner: ${missing.join(', ')}`);
+  const idx = name => headers.indexOf(name);
+  const rows = lines.map(line => {
+    const c = splitCsvLine(line);
+    return {
+      date:c[idx('date')],
+      open:parseNumber(c[idx('open')]),
+      high:parseNumber(c[idx('high')]),
+      low:parseNumber(c[idx('low')]),
+      close:parseNumber(c[idx('close')]),
+      volume:parseNumber(c[idx('volume')]) || 0
+    };
+  }).filter(r=>/^\d{4}-\d{2}-\d{2}/.test(r.date) && [r.open,r.high,r.low,r.close].every(Number.isFinite));
+  if (rows.length < 30) throw new Error(`För få giltiga rader (${rows.length}). Minst 30 rekommenderas, helst 120+ för EMA100.`);
+  return rows.sort((a,b) => a.date.localeCompare(b.date));
+}
+
+async function handleCSVFile(file) {
+  try {
+    if (!file) return;
+    const rows = parseCSV(await file.text());
+    const name = $('datasetName').value && $('datasetName').value !== 'CSV-data' ? $('datasetName').value : file.name.replace(/\.csv$/i, '');
+    const dataset = { type:'csv', source:`CSV-import (${file.name})`, name, rows };
+    setCsvStatus(`CSV laddad: ${file.name}. ${rows.length} rader. Datum: ${dateRange(rows)}.`, 'success');
+    renderDataset(dataset, true);
+  } catch (err) {
+    setCsvStatus(`CSV-fel: ${err.message}`, 'danger');
+    setStatus('CSV-import misslyckades. Kontrollera kolumnerna Date, Open, High, Low, Close, Volume.', 'danger');
+  }
+}
+
+function loadSample() {
+  const sample = SAMPLE_DATASETS[$('sampleSelect').value];
+  const rows = sample.rows.map(r => ({ ...r }));
+  setCsvStatus('Demo laddad. Importera CSV för riktig marknadsdata.', 'warning');
+  renderDataset({ type:'demo', source:'Inbyggd demo/testdata', name:sample.name, rows }, true);
+}
+
+async function tryLiveFetch() {
+  const symbol = $('liveSymbol').value.trim();
+  if (!symbol) return;
+  setStatus('Försöker hämta live-data. Om detta misslyckas: importera CSV.', 'warning');
+  try {
+    const rows = await loadYahooData(symbol);
+    renderDataset({ type:'live', source:'Yahoo Finance chart endpoint (liveförsök)', name:symbol, rows }, true);
+    setCsvStatus('Liveförsök lyckades den här gången. CSV är fortfarande säkraste standardflödet för standalone Chrome.', 'success');
+  } catch (err) {
+    setStatus(`<strong>Live data failed. Import CSV to backtest real data.</strong><br>Yahoo/API/CORS failed: ${err.message}. Chrome kan blockera fetch på grund av CORS, endpoint-restriktioner och browser-säkerhet.`, 'danger');
+    setCsvStatus('Live-data misslyckades. Dra in en CSV-fil för att använda verklig historikdata.', 'danger');
+    renderDataset({ type:'demo', source:`Fallback demo efter live-fel (${err.message})`, name:'Demo: trend up', rows:SAMPLE_DATASETS.trendUp.rows.map(r => ({ ...r })) }, true);
+  }
+}
+
+function loadJournal(){ const rows = JSON.parse(localStorage.getItem('aiSignalJournal') || '[]'); $('journalRows').innerHTML = rows.map(r=>`<tr><td>${r.time}</td><td>${r.symbol}</td><td>${r.note}</td></tr>`).join(''); }
+
+$('runBtn').addEventListener('click', runBacktest);
+$('loadSampleBtn').addEventListener('click', loadSample);
+$('tryLiveBtn').addEventListener('click', tryLiveFetch);
+$('csvFile').addEventListener('change', e => handleCSVFile(e.target.files[0]));
+['dragenter','dragover'].forEach(eventName => $('dropZone').addEventListener(eventName, e => { e.preventDefault(); $('dropZone').classList.add('dragover'); }));
+['dragleave','drop'].forEach(eventName => $('dropZone').addEventListener(eventName, e => { e.preventDefault(); $('dropZone').classList.remove('dragover'); }));
+$('dropZone').addEventListener('drop', e => handleCSVFile(e.dataTransfer.files[0]));
+$('saveNote').addEventListener('click', () => { const note = $('journalNote').value.trim(); if (!note) return; const rows = JSON.parse(localStorage.getItem('aiSignalJournal') || '[]'); rows.unshift({ time:new Date().toLocaleString('sv-SE'), symbol:$('datasetName').value || 'Okänd', note }); localStorage.setItem('aiSignalJournal', JSON.stringify(rows.slice(0,100))); $('journalNote').value=''; loadJournal(); });
+initDates(); loadJournal(); loadSample();
+</script>
+</body>
+</html>
